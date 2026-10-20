@@ -295,3 +295,17 @@ vLLM 的 `--kv-transfer-config` 起始结构（其余启动参数复用 Gate 3 �
 - [S13] openYuanRong DataSystem：https://github.com/openyuanrong/datasystem
 
 > 文档维护规则：任何“支持”升级为“已验证”前，应附 **硬件 SKU + Kernel + OS + HDK + CANN + LingQu + Git commit/包版本 + 模型权重 hash + 启动参数 + 功能与性能报告**。此外，公开文档的 `main` 会演进，尽可能记录实际部署时使用的 git commit。
+
+[S1]: https://www.hiascend.com/zh/developer/techArticles/20260630-10
+[S2]: https://github.com/openeuler-mirror/umdk
+[S3]: https://github.com/kvcache-ai/Mooncake/blob/main/docs/source/design/transfer-engine/ascend_direct_transport.md
+[S4]: https://github.com/kvcache-ai/Mooncake/blob/main/mooncake-common/common.cmake
+[S5]: https://docs.vllm.ai/projects/ascend/en/main/user_guide/feature_guide/kv_cache_pool_ascend_store.html
+[S6]: https://docs.vllm.ai/projects/ascend/en/latest/tutorials/models/DeepSeek-V4.1-Flash.html
+[S7]: https://github.com/vllm-project/vllm-ascend/pull/16973
+[S8]: https://docs.vllm.ai/projects/ascend/en/main/user_guide/release_notes.html
+[S9]: https://github.com/kvcache-ai/Mooncake/issues/4282
+[S10]: https://github.com/Ascend/memfabric_hybrid
+[S11]: https://github.com/kvcache-ai/Mooncake/issues/3093
+[S12]: https://github.com/Ascend/memcache
+[S13]: https://github.com/openyuanrong/datasystem
