@@ -21,6 +21,7 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 > 当前内容为 **设计方案**，不是已经完成或验证的生产实现；方案中的新 API、SDK 与 Protocol 属于待开发部分。上游已有能力与具体参考链接详见文档第 8、18 节。
 
 **维护说明**：创建日期 2026-10-17。工程实现前需固定模型权重、引擎 commit、Attention Backend 与具体硬件，对照测试矩阵验证。
+
 ### Linux 5.10 + 灵衢 HCCS：DRAM 物理地址不重叠时的四路线替代方案（2026-10-23）
 
 **[阅读最新实测约束与决策表](docs/ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)**
