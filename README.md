@@ -4,6 +4,18 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### NVIDIA Flare Local Inference：专用推理引擎架构与 RTX PRO 5000 适配评估（2026-10-24）
+
+**[阅读完整技术评估与 PoC 方案](docs/nvidia-flare-local-inference-architecture-and-rtx-pro-5000-evaluation.md)**
+
+- **架构**：Python Ignition 准备模型与 CUDA Graph，Rust Helios 使用不可变 Runtime Package 进行原生服务。
+- **Agent 状态**：将 Attention KV、Recurrent State、分支与推测解码回滚统一纳入缓存恢复语义。
+- **适配边界**：仅面向 NVIDIA SM120/SM121；RTX PRO 5000 72GB 架构匹配，但 TP8 和具体模型组合不能推定已验证。
+- **决策**：建议先以同机 Qwen TP2、GLM/DeepSeek 支持的 TP4 做正确性和 TTFT/TPOT 对照，不把研究原型直接替代 vLLM 生产服务。
+
+> 原文明确定位为研究原型。文档区分上游实现证据、设计目标和待实测能力。
+
+
 ### Client-Owned KV Cache：客户端主导的推理状态管理
 
 **[阅读完整设计文档](docs/client-owned-kv-cache-design.md)**
