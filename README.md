@@ -21,6 +21,17 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 > 当前内容为 **设计方案**，不是已经完成或验证的生产实现；方案中的新 API、SDK 与 Protocol 属于待开发部分。上游已有能力与具体参考链接详见文档第 8、18 节。
 
 **维护说明**：创建日期 2026-10-17。工程实现前需固定模型权重、引擎 commit、Attention Backend 与具体硬件，对照测试矩阵验证。
+### Linux 5.10 + 灵衢 HCCS：DRAM 物理地址不重叠时的四路线替代方案（2026-10-23）
+
+**[阅读最新实测约束与决策表](docs/ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)**
+
+- **现场已确认**：MemFabric `mem_scan.py` 结果为 0 GB，且 x86 DRAM 与所需 HCCS 地址窗口无重叠；原 `device_sdma` 直访 DRAM PoC 暂停。
+- **本地 CPU DRAM Offload**：优先评估 LMCache-Ascend MP；同时保留 vLLM-Ascend CPU OffloadingConnector。
+- **跨节点 KV Pool**：对照 Mooncake Ascend Direct Buffer Pool 与 YuanRong HIXL/HCCS Buffer Pool；LMCache HCCS P/D 示例是单机双 NPU 的有限验证，跨机仍需测试。
+- **内核/BIOS**：不能把标准 UMDK/URMA 的 6.6 公开构建基线推广至所有数据面；BIOS 升级需特定 OEM 补丁号和地址修复证据。
+
+> 本篇结论优先级**覆盖** 2026-10-20 旧调研中尚无现场证据时的 MemCache `device_sdma` 首选建议。
+
 ### 灵衢 KV Cache Pool：910C / x86 / Kernel 5.10 可行性与 PoC
 
 **[阅读完整调研与实施方案](docs/ascend-910c-kernel510-kv-cache-pool-feasibility.md)**
