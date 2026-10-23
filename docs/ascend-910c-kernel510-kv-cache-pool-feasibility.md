@@ -1,6 +1,6 @@
 # 昇腾 910C / x86 / Linux 5.10 上的灵衢 KV Cache Pool：Mooncake、MemCache、MemFabric、YuanRong 与 DeepSeek V4.1 Flash
 
-> 调研基准：2026-10-20  
+> **【2026-10-23 重要勘误／新现场事实】** 用户现场已实测 MemFabric `mem_scan.py` 返回 **0 GB**，并确认 x86 Host DRAM 与所需 HCCS 设备可达地址窗口**没有重叠**。因此本文原推荐的 `MemCache → MemFabric → device_sdma` **P0 顺序已不适用于该现场，不能按旧文的 Gate 1/2 继续直接部署**。请优先阅读[新四路线对比与替代 PoC](ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)：本地 Offload 优先 LMCache-Ascend MP，跨节点优先 Mooncake/YuanRong 的非 FabricMem Buffer Pool。原文仅作为历史可行性分析与 V4.1 特殊 KV 状态研究资料保留。\n\n> 调研基准：2026-10-20  
 > 目标环境：**昇腾 910C + x86 Host + Linux Kernel 5.10**；希望在不升级 Host 内核的前提下，实现灵衢互联下的 KV Cache DRAM/SSD Offload 和跨节点复用。  
 > 状态：**技术可行性评估与 PoC 计划，并非已在目标机器验证的生产配置。**  
 > 证据标准：**官方明确支持**、**组件级已支持**、**待整体验证**、**不建议/缺乏支持证据**分别标注。
@@ -249,7 +249,7 @@ vLLM 的 `--kv-transfer-config` 起始结构（其余启动参数复用 Gate 3 �
 
 ### 推荐路线
 
-**P0（可执行）**：`A3 Device UB + MemFabric device_sdma + MemCache + AscendStoreConnector + DeepSeek V4.1 Flash`。
+**P0（历史建议，2026-10-23 已暂停）**：~~`A3 Device UB + MemFabric device_sdma + MemCache + AscendStoreConnector + DeepSeek V4.1 Flash`~~。现场 `mem_scan.py=0GB` 且物理地址窗口不重叠；改用[四路线替代 PoC 决策表](ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)。
 
 - 若 Gate 0 的新 HDK/CANN 与 5.10 不兼容，则**不要直接升级生产内核**；先在隔离机器验证新驱动栈，或将模型服务与 KV Pool 分成不同节点/版本边界研究兼容性。
 - 若 Gate 1 的 device_sdma 不通，先排查是不是“具有 910C 型号但不属于支持 FabricMem 的 A3 拓扑”，再决定走 `device_rdma` / Host RoCE。
