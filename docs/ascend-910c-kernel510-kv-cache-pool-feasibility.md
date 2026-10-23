@@ -1,6 +1,8 @@
 # 昇腾 910C / x86 / Linux 5.10 上的灵衢 KV Cache Pool：Mooncake、MemCache、MemFabric、YuanRong 与 DeepSeek V4.1 Flash
 
-> **【2026-10-23 重要勘误／新现场事实】** 用户现场已实测 MemFabric `mem_scan.py` 返回 **0 GB**，并确认 x86 Host DRAM 与所需 HCCS 设备可达地址窗口**没有重叠**。因此本文原推荐的 `MemCache → MemFabric → device_sdma` **P0 顺序已不适用于该现场，不能按旧文的 Gate 1/2 继续直接部署**。请优先阅读[新四路线对比与替代 PoC](ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)：本地 Offload 优先 LMCache-Ascend MP，跨节点优先 Mooncake/YuanRong 的非 FabricMem Buffer Pool。原文仅作为历史可行性分析与 V4.1 特殊 KV 状态研究资料保留。\n\n> 调研基准：2026-10-20  
+> **【2026-10-23 重要勘误／新现场事实】** 用户现场已实测 MemFabric `mem_scan.py` 返回 **0 GB**，并确认 x86 Host DRAM 与所需 HCCS 设备可达地址窗口**没有重叠**。因此本文原推荐的 `MemCache → MemFabric → device_sdma` **P0 顺序已不适用于该现场，不能按旧文的 Gate 1/2 继续直接部署**。请优先阅读[新四路线对比与替代 PoC](ascend-kernel510-hccs-dram-address-mismatch-kv-offload-comparison.md)：本地 Offload 优先 LMCache-Ascend MP，跨节点优先 Mooncake/YuanRong 的非 FabricMem Buffer Pool。原文仅作为历史可行性分析与 V4.1 特殊 KV 状态研究资料保留。
+
+> 调研基准：2026-10-20  
 > 目标环境：**昇腾 910C + x86 Host + Linux Kernel 5.10**；希望在不升级 Host 内核的前提下，实现灵衢互联下的 KV Cache DRAM/SSD Offload 和跨节点复用。  
 > 状态：**技术可行性评估与 PoC 计划，并非已在目标机器验证的生产配置。**  
 > 证据标准：**官方明确支持**、**组件级已支持**、**待整体验证**、**不建议/缺乏支持证据**分别标注。
@@ -9,9 +11,9 @@
 
 1. **不应因为采用 Mooncake/MemCache 就一律升级到 Linux 6.6。** 昇腾官方在 2026-06-30 发表的 `vLLM-Ascend + MemCache 1.2.0 + MemFabric 1.2.0` 三级缓存参考实践，采用 openEuler 22.03 LTS SP4，并建议 Host Kernel **≥5.10**；其中包含 Atlas 800I A3。**但该参考实践未列 DeepSeek V4.1 Flash 为验证模型。** [S1]
 2. **Mooncake 原生 UB/URMA 与 Ascend Direct 不同。** Mooncake `USE_UB` 经 `liburma` 使用原生 UB；UMDK 当前公开构建环境为 **openEuler 配套 Kernel 6.6**。Mooncake 昇腾推荐的 `USE_ASCEND_DIRECT` 使用 CANN ADXL/HIXL；不能将 UMDK 的 6.6 要求直接套用到全部 Mooncake Offload 方案。[S2][S3][S4]
-3. **对于 A3 灵衢上的 KV Pool，最值得先验证的是 `AscendStoreConnector → MemCache → MemFabric → device_sdma`。** vLLM-Ascend 官方说明 A3 HCCS 的 `device_sdma` 要求灵衢计算网络 ≥1.5。[S5]
+3. **历史参考路径（已被 2026-10-23 现场实测否定）**：`AscendStoreConnector → MemCache → MemFabric → device_sdma` 曾是无现场地址约束时的 P0；当前 x86 DRAM/HCCS 地址无重叠，不得继续按此路线直接部署。A3 HCCS 的 `device_sdma` 要求灵衢计算网络 ≥1.5 的一般要求依然成立。[S5]
 4. **DeepSeek V4.1 Flash 在 A3 有官方 W8A8 部署指南，且 AscendStore 相关准备已合入 PR #16973；但“V4.1 + MemCache + x86 + Kernel 5.10”没有找到完整硬件联调报告。** 模型的混合 KV、SWA/Bounded Replay、Indexer/请求私有状态和推测解码是正确性关键。[S6][S7][S8]
-5. **正式推荐：先保持 Host 5.10，固定 HDK/CANN/灵衢版本并做逐层验证；PoC 首选 MemCache + MemFabric，Mooncake Ascend Direct 作为对照。** 不建议将 Mooncake TENT + 独立 MemFabric Transport 视为官方现成方案：上游维护者在 2026-09 已明确不鼓励与 Ascend Direct 平行的 MemFabric TENT 后端。[S9]
+5. **已被新现场证据替代的旧推荐**：保持 Host 5.10、固定 HDK/CANN/灵衢版本的原则仍保留；PoC 首选项已调整为本地 LMCache-Ascend MP、跨节点 Mooncake/YuanRong 的 Buffer Pool 路线。旧文原建议的 MemCache + MemFabric 直访不再适合当前硬件。 不建议将 Mooncake TENT + 独立 MemFabric Transport 视为官方现成方案：上游维护者在 2026-09 已明确不鼓励与 Ascend Direct 平行的 MemFabric TENT 后端。[S9]
 
 ### 关键判定表
 
@@ -104,7 +106,7 @@
 
 | 技术路线 | 优势 | 主要限制 | 本场景优先级 |
 |---|---|---|---|
-| **AscendStore → MemCache → MemFabric (`device_sdma`)** | A3 有明确 Device UB 路径，5.10 参考实践；独立 DRAM/SSD 缓存管理 | 型号/互联/HDK 配套；V4.1 端到端待测 | **P0** |
+| **AscendStore → MemCache → MemFabric (`device_sdma`)** | A3 有明确 Device UB 路径，5.10 参考实践；独立 DRAM/SSD 缓存管理 | **当前实测 Host DRAM 与 HCCS 地址窗口不重叠，无法按此直接访问 DRAM** | **已暂停；参见新文** |
 | **AscendStore → Mooncake → Ascend Direct** | Mooncake 多硬件生态；通过 CANN/ADXL 对接 HBM 与主机传输 | 新 CANN/驱动在 5.10 上的具体兼容性待定；预编译 wheel 可能要求 glibc ≥2.35 | **P1 对照** |
 | AscendStore → YuanRong DataSystem | Object/KV/Worker、多节点数据系统 | 灵衢路径与目标版本需具体核对，V4.1 组合待测 | P2 |
 | Mooncake `USE_UB` → URMA | 可更直接管理 Host 侧 UB 传输资源 | 官方 UMDK 6.6 基线，HBM 直访未得到证明，x86 5.10 不宜默认支持 | 研发性研究 |
