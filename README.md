@@ -4,6 +4,18 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### Tutti × Gandalf × DeepSeek V4.1 Flash：寿命感知 SSD KV Cache（2026-10-25）
+
+**[阅读完整架构分析、容量推导与 PoC 方案](docs/tutti-gandalf-deepseek-v41-flash-ssd-kv-lifecycle.md)**
+
+- **架构互补**：DeepSeek V4.1 定义 KV 生命周期，Gandalf 控制 SSD Admission / TBW，Tutti 提供 GPU-centric NVMe I/O 数据面。
+- **模型特殊性**：CSA2 Global KV / Indexer 是长期前缀恢复状态，128-token SWA 优先由 Bounded Replay 重建；不能简单把全部 Sparse 状态排除在 SSD 外。
+- **寿命边界**：Gandalf 论文的平均 7.3× 来自其他模型与特定 Trace，不是 V4.1 的实测；先验证 Global KV 增量持久化、去重与写预算。
+- **适配状态**：Tutti 有 vLLM Connector，但 DeepSeek 专门适配、FP4/Indexer 恢复闭包、特定 GPU↔SSD P2P 路径仍需验证。
+- **实施顺序**：Trace Replay → Gandalf-inspired Policy 基线 → Tutti V4.1 Adapter → PD 分离跨节点管理。
+
+> 这是**设计和适配评估**，非 Tutti × Gandalf × V4.1 已通过端到端生产验证的声明。
+
 ### NVIDIA Flare Local Inference：专用推理引擎架构与 RTX PRO 5000 适配评估（2026-10-24）
 
 **[阅读完整技术评估与 PoC 方案](docs/nvidia-flare-local-inference-architecture-and-rtx-pro-5000-evaluation.md)**
