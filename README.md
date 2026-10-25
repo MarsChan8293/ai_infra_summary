@@ -12,6 +12,7 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 - **模型特殊性**：CSA2 Global KV / Indexer 是长期前缀恢复状态，128-token SWA 优先由 Bounded Replay 重建；不能简单把全部 Sparse 状态排除在 SSD 外。
 - **寿命边界**：Gandalf 论文的平均 7.3× 来自其他模型与特定 Trace，不是 V4.1 的实测；先验证 Global KV 增量持久化、去重与写预算。
 - **适配状态**：Tutti 有 vLLM Connector，但 DeepSeek 专门适配、FP4/Indexer 恢复闭包、特定 GPU↔SSD P2P 路径仍需验证。
+- **Engram SSD Offload 性能**：新增 vLLM PR #62238/#56757、B200/Strix Halo 的 Prefill/Decode 实验数据及 Page Cache/Host 同步开销；默认优先 CPU DRAM，SSD mmap 仅作为容量受限时的实验方案。
 - **实施顺序**：Trace Replay → Gandalf-inspired Policy 基线 → Tutti V4.1 Adapter → PD 分离跨节点管理。
 
 > 这是**设计和适配评估**，非 Tutti × Gandalf × V4.1 已通过端到端生产验证的声明。
