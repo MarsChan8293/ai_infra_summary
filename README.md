@@ -4,6 +4,19 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### vLLM × vLLM-Ascend：最近三个月 Top 架构新特性（2026-10-30）
+
+**[阅读两社区 Top 10 对比、HiSparse/Elastic EP 深析与硬件 PoC 建议](docs/vllm-vllm-ascend-top-features-2026-07-10.md)**
+
+- **统计窗口**：2026-07-30 至 2026-10-30；排除新增模型支持，重点讨论执行架构、KV、并行、权重及调度。
+- **vLLM Top**：HiSparse、Elastic EP、Model Runner V2、Preload/Fast Start、Tiered KV、KV Push/双向传输。
+- **vLLM-Ascend Top**：Sparse KV Offload（Hybrid HiSparse 对齐中）、PCP/DCP、KV Pool、TurboQuant/C8、NPU Graph、NetLoader/RFork。
+- **状态边界**：严格区分 Released、RC、Merged/Experimental、Draft/RFC；Ascend HiSparse 完整适配尚未合入。
+- **实施优先级**：长上下文稀疏 KV、动态 EP、Weight/Engine 解耦；分别提出 RTX PRO 5000、H800、910B、910C（5.10/灵衢）、950PR 的验证矩阵。
+
+> 这是面向技术选型的阶段性盘点，不是所有模型、卡型与并行组合均已正式支持的声明。
+
+
 ### Tutti × Gandalf × DeepSeek V4.1 Flash：寿命感知 SSD KV Cache（2026-10-25）
 
 **[阅读完整架构分析、容量推导与 PoC 方案](docs/tutti-gandalf-deepseek-v41-flash-ssd-kv-lifecycle.md)**
