@@ -4,6 +4,18 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### ModelSphere vs MindIE Motor：异构 MaaS 控制面与分布式推理运行时（2026-11-06）
+
+**[阅读完整架构对比、能力矩阵与 910C PoC 方案](docs/modelsphere-vs-mindie-motor-control-plane-2026-11-06.md)**
+
+- **选型结论**：ModelSphere 偏多模型、异构资源、SLO 决策与 AutoTune；MindIE Motor 3.2.0 偏昇腾 PD/EPD、KV Conductor、实例编排与故障恢复。
+- **KV 路由差异**：ModelSphere CART 是字符前缀/路由历史估计；Motor KV Conductor 依赖真实 KV 事件与 HBM/CPU/Disk 块索引，不能将两者等同于跨芯片共享 KV。
+- **支持边界**：Motor 的 KV Pool、请求续推、自动扩缩容受引擎和 K8s/Docker 模式约束；ModelSphere 的 PD/L3 KV 宣称需要按硬件和引擎链路验证。
+- **落地建议**：910C 的 DeepSeek V4.1 Flash PD 优先 Motor；跨 NVIDIA/Ascend 的 MaaS 上层可借鉴 ModelSphere 的 Console、Catalog、SLO 与 AutoTune。
+- **现场风险**：Linux 5.10 + 灵衢 x86 的 MemCache 地址窗口问题不能通过替换上层控制面解决；附缓存验收、扩缩容、故障恢复的 PoC 步骤。
+
+> 本篇以公开代码和官方文档为依据，明确区分现有特性、受限支持与待端到端验证的跨硬件能力。
+
 ### vLLM × vLLM-Ascend：最近三个月 Top 架构新特性（2026-10-30）
 
 **[阅读两社区 Top 10 对比、HiSparse/Elastic EP 深析与硬件 PoC 建议](docs/vllm-vllm-ascend-top-features-2026-07-10.md)**
