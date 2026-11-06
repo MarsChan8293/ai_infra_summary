@@ -4,6 +4,18 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### AI Gateway 选型：Higress / APISIX / LiteLLM / agentgateway / Kinference / ModelSphere（2026-11-06）
+
+**[阅读完整能力矩阵、架构选型与部署 PoC 方案](docs/ai-gateway-comparison-for-mindie-motor-and-heterogeneous-maas-2026-11-06.md)**
+
+- **分层架构**：企业 Gateway 负责鉴权、租户、Token 配额和模型服务级路由；MindIE Motor 保留 PD/EP 与 KV Conductor 内部调度，避免双重选路。
+- **生产优先**：910C + DeepSeek V4.1 Flash 推荐 Higress（或 APISIX）+ MindIE Motor；租户账务侧重时评估 LiteLLM。
+- **Kinference 定位**：真实 KV 事件 + Token Block + 预测 TTFT + K8s InferencePolicy，有 Prometheus/Grafana；但 Kinference 与 Buoyant Gateway 均为 Alpha，不应直接替换 Motor。
+- **监控纠偏**：MindIE Motor 官方已经提供 Prometheus、Grafana、Tempo 等可观测性示例与三套 Dashboard；建议直接复用，并增加 Gateway 和 NPU 指标。
+- **能力边界与验收**：区别服务级路由/真实 KV 亲和/跨芯片 KV 数据互通，提供 SSE、配额、故障、TTFT/TPOT 和可观测性的 PoC 测试矩阵。
+
+> 公开源码与文档选型报告，支持矩阵不等于 910C/NVIDIA 目标组合已完成实测。
+
 ### ModelSphere vs MindIE Motor：异构 MaaS 控制面与分布式推理运行时（2026-11-06）
 
 **[阅读完整架构对比、能力矩阵与 910C PoC 方案](docs/modelsphere-vs-mindie-motor-control-plane-2026-11-06.md)**
