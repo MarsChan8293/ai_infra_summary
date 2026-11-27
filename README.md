@@ -4,6 +4,17 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ## 专题方案
 
+### MindIE-Motor vs llm-d：分布式推理运行时架构与功能对比（2026-11-27）
+
+**[阅读完整架构对比、能力矩阵与异构推理平台建议](docs/mindie-motor-vs-llm-d-architecture-comparison-2026-11-27.md)**
+
+- **架构差异**：Motor 侧重 Coordinator / Controller / NodeManager 集成式运行时；llm-d 侧重 Gateway / EPP / K8s 控制器的可组合架构。
+- **功能对比**：请求调度、PD/EPD、KV 索引与池化、弹性伸缩、硬件级故障恢复、多租户及 MHE 配置。
+- **选型建议**：昇腾优先 Motor，NVIDIA 优先 llm-d；异构 MaaS 采用统一控制面与多 Runtime Adapter，避免双重实例选点。
+- **验证边界**：跨厂商路由不等于跨芯片 KV 共享；按 KV ABI 兼容域组织缓存，附性能、故障、扩缩容及正确性 PoC 矩阵。
+
+> 架构选型归档，版本细项未重新逐项核验，评分不代表实测性能。
+
 ### AI Gateway 选型：Higress / APISIX / LiteLLM / agentgateway / Kinference / ModelSphere（2026-11-06）
 
 **[阅读完整能力矩阵、架构选型与部署 PoC 方案](docs/ai-gateway-comparison-for-mindie-motor-and-heterogeneous-maas-2026-11-06.md)**
