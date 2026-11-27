@@ -5,7 +5,7 @@
 - 对比基线：MindIE-Motor 3.x 与 llm-d 公开架构（包括此前调研中的 v1.0 能力描述）。
 - 证据边界：本文由对话中的架构调研整理而来，未重新逐项核验版本标签、功能合入状态及支持矩阵，未进行实机测试。特性支持必须结合具体 release/commit、引擎、模型、硬件与部署方式验证。以下架构图为职责示意，不是严格的请求路径。
 
-- 更新：补齐 SVG 配图及跨硬件适配工作量；保留 Mermaid、可检索表格及原始 CSV。配图目录：[assets](../assets/mindie-motor-vs-llm-d/README.md)。
+- 更新：补齐 SVG 配图及跨硬件适配工作量；使用 SVG 单一图示、保留可检索表格及原始 CSV。配图目录：[assets](../assets/mindie-motor-vs-llm-d/README.md)。
 
 ## 1. 核心结论
 
@@ -21,46 +21,9 @@
 
 ### 2.1 MindIE-Motor
 
-```mermaid
-flowchart TD
-    A[Client / AI Gateway] --> B[Coordinator]
-    B --> B1[Endpoint / Router / Scheduler / RequestManager]
-    B --> K[KV Conductor]
-    C[Controller] -. 实例与故障管理 .-> N[NodeManager]
-    D[Deployer / MindCluster / K8s] -. 部署配置 .-> C
-    B1 --> P[Prefill Engine]
-    B1 --> Q[Decode Engine]
-    B1 --> U[Union Engine]
-    N -. 进程管理 .-> P
-    N -. 进程管理 .-> Q
-    N -. 进程管理 .-> U
-    P -->|KV Transfer| Q
-    P <--> S[External KV Pool]
-    Q <--> S
-    K -. 缓存位置元数据 .-> B1
-```
-
 Coordinator 负责请求入口、负载及实例选点、PD 协调；Controller 与 NodeManager 协作管理实例角色、进程及故障；Deployer 承担配置与部署。外部 KV 后端通过引擎 Connector 对接，不应把 Motor 本身视作 KV 数据存储引擎。
 
 ### 2.2 llm-d
-
-```mermaid
-flowchart TD
-    A[Client] --> G[Gateway / Envoy]
-    G <-->|选点咨询| E[EPP / Inference Scheduler]
-    K[KV Cache Indexer] --> E
-    I[InferencePool / Variants] -. 候选实例 .-> E
-    G --> P[Prefill Engine]
-    G --> Q[Decode Engine]
-    G --> U[Colocated Engine]
-    P -->|KV Transfer| Q
-    C[K8s Controllers / LWS / DisaggregatedSet] -. 编排 .-> P
-    C -. 编排 .-> Q
-    C -. 编排 .-> U
-    H[Autoscaler / SLO Metrics] -. 副本调整 .-> C
-    P <--> S[KV Offload / Shared Storage / P2P]
-    Q <--> S
-```
 
 Gateway/代理与 EPP（Endpoint Picker）分工：前者承载流量，后者根据插件生成选点决策。Kubernetes 控制器负责工作负载编排，伸缩与 KV 索引由独立组件提供。具体组件随部署指南和版本变化；图中编排、索引、存储不是请求必须串行经过的路径。
 
@@ -140,17 +103,6 @@ Motor 将请求解析、负载统计、选点、PD 协同与故障隔离集中�
 
 Motor 借助 MultiConnector 等方式组合 PD 实时传输和外部 KV 后端。llm-d 强调全局缓存索引与调度、P2P 获取、分层卸载的协同。两者并不是“一个只有外部池、一个才有全局索引”的互斥设计。
 
-```mermaid
-flowchart LR
-    R[Scheduler / EPP] <-->|元数据| I[Global KV Index]
-    P[Prefill HBM] -->|PD KV transfer| D[Decode HBM]
-    P <--> C[CPU DRAM]
-    D <--> C
-    C <--> S[Shared Store / SSD]
-    I -. 块位置与生命周期 .-> P
-    I -. 块位置与生命周期 .-> D
-```
-
 Motor 更适合作为昇腾存储后端集成参考；llm-d 更适合作为全局索引、调度联动与多层缓存组合参考。实际数据移动能力取决于 Connector、引擎和硬件。
 
 跨芯片 KV 共享必须单独验证：模型权重、tokenizer、位置编码、Attention/MLA/SWA/Indexer 状态、dtype、量化 scale、block size、TP/EP 切分、layout、版本及传输协议。定义兼容域，不兼容时转换或回退 Prefill；不能用跨厂商实例路由代替 KV ABI 兼容。
@@ -224,26 +176,6 @@ Motor 以负载指标、HPA/Infer Operator 及 PD 配比建议为参考，llm-d 
 ![统一异构推理平台](../assets/mindie-motor-vs-llm-d/unified-platform.svg)
 
 
-
-```mermaid
-flowchart TD
-    A[MaaS Portal / API / MCP / Agent] --> G[Enterprise AI Gateway]
-    A --> C[Unified Control Plane]
-    C --> M[MHE Catalog / Deploy / SLO / AutoTune / Reliability]
-    M -. 管理 .-> R1[Motor Runtime Adapter]
-    M -. 管理 .-> R2[llm-d Runtime Adapter]
-    M -. 管理 .-> R3[Other Runtime Adapter]
-    G --> R1
-    G --> R2
-    G --> R3
-    R1 --> E1[vLLM-Ascend]
-    R2 --> E2[vLLM / SGLang]
-    R3 --> E3[Vendor Engine]
-    E1 <--> K[KV Federation by Compatibility Domain]
-    E2 <--> K
-    E3 <--> K
-    K <--> S[Mooncake / MemCache / CPU / SSD]
-```
 
 | 模块 | 建议 |
 |---|---|
