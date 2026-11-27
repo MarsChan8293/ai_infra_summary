@@ -12,6 +12,7 @@ AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
 ![Motor 与 llm-d 整体架构](assets/mindie-motor-vs-llm-d/architecture.svg)
 
+- **硬件生态专题（4.5）**：按 nightly E2E、社区 PD、厂商 PoC 与未确认分级；覆盖 NVIDIA/AMD/Intel/TPU、天数、沐曦、壁仞、摩尔线程、海光、Rebellions、昇腾，附 Connector 与适配边界。[硬件生态矩阵](assets/mindie-motor-vs-llm-d/hardware-ecosystem.svg)。
 - **跨硬件适配工作量（估算）**：Motor → GPU 20–38 人周；llm-d → NPU 15–31 人周。PD 可能是例外，完整 RAS 对齐另行评估。
 - **配图与数据**：[独立 SVG、CSV 资产目录](assets/mindie-motor-vs-llm-d/README.md)。
 
