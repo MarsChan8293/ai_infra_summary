@@ -18,3 +18,6 @@
 | [runtime-agent.svg](runtime-agent.svg) | 长期 Runtime Agent |
 | [effort-data.csv](effort-data.csv) | 工作量数据 |
 | [capability-data.csv](capability-data.csv) | 评分数据 |
+| [hardware-ecosystem.svg](hardware-ecosystem.svg) | 硬件生态证据矩阵 |
+| [hardware-abstraction.svg](hardware-abstraction.svg) | 多硬件抽象及接口合同 |
+| [hardware-ecosystem-data.csv](hardware-ecosystem-data.csv) | 硬件生态证据数据 |
