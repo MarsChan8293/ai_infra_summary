@@ -123,17 +123,132 @@ Motor 以负载指标、HPA/Infer Operator 及 PD 配比建议为参考，llm-d 
 
 伸缩须考虑权重加载时间、缓存冷启动、P/D 容量不匹配和集群资源约束。要将排队、TTFT、TPOT/ITL、吞吐、KV 使用率与有效命中率联合纳入决策，不能只凭 KV 使用率判断瓶颈。
 
-### 4.5 硬件生态
+### 4.5 硬件生态（2026-11-27 扩展核验）
 
-| 硬件 | Motor | llm-d |
+**结论：Motor 的优势是昇腾纵向深度，llm-d 的优势是横向多厂商广度。** llm-d 不仅是 NVIDIA vLLM 的编排器：AMD、Intel、TPU 已有 E2E 路径；天数、沐曦、壁仞、摩尔线程、Rebellions 已有社区 PD 方案；海光在 main 分支也已有 SGLang PD 路径。昇腾目前确认的是厂商侧基础接入，不能归为上游全功能支持。不同功能成熟度不能用一个“支持”概括。
+
+#### 4.5.1 证据分级与横向矩阵
+
+核验基准：Motor 3.2.0 及 latest 官方文档；llm-d release-1.0 官方指南与 GitHub main 滚动文档分别看待。**main 新配置不自动算入 v1.0 已发布能力。** A/B 对应上游指南验证语义，C/D 为本报告补充分级。
+
+| 等级 | 证据 | 含义 |
 |---|---|---|
-| NVIDIA | 非主要路线 | 主要路线 |
-| Ascend 910B | 重点生态，组合需验证 | 有基础接入方向，完整能力待验证 |
-| Ascend 910C / 950PR / DT | 优先评估，按具体产品和版本核验 | PD、Wide EP、KV 和 RAS 待端到端验证 |
-| AMD / TPU / Intel XPU | 未确认 | 多硬件生态，具体指南和版本待确认 |
-| 天数、沐曦、壁仞、摩尔线程 | 未确认 | 不应仅凭社区集成宣称完整支持，需核验 |
+| A | validated / nightly E2E | 具体参考组合有持续测试路径，非所有卡型生产认证 |
+| B | community | 社区/厂商维护部署方案，未纳入该路径 nightly E2E |
+| B* | main 分支社区配置 | 目标 release 是否包含需核验 |
+| C | 厂商侧独立基础验证 | 最小链路跑通，上游完整适配未确认 |
+| D | 文档提及或间接证据 | 具体卡型、配置或结果待查 |
+| — | 本次未确认 | 不代表技术上不可能 |
 
-此前调研涉及 Ascend 上 Envoy + EPP + vLLM-Ascend 的单卡、非 K8s 基础接入示例。即便可运行请求链路，也不等价于完整的 PD 分离、Wide EP、KV 池化与 RAS 适配。
+![逐硬件能力证据矩阵](../assets/mindie-motor-vs-llm-d/hardware-ecosystem.svg)
+
+| 硬件厂商 | 参考平台 | llm-d 基础部署 | PD | 精确 KV 路由 | 分层 KV | Motor |
+|---|---|---|---|---|---|---|
+| NVIDIA | H200 | A | A | A | A | 未确认 |
+| AMD | Instinct / MI300X | A | A | A | A | 未确认 |
+| Intel | Max / Arc XPU | A | A | A | A | 未确认 |
+| Google TPU | v5p / GKE | A | A | A | A | 未确认 |
+| Google TPU | v6e / v7 / GKE | B | B | B | B | 未确认 |
+| 天数智芯 | BI-V150 | B | B | — | — | 未确认 |
+| 沐曦 | C500X | B | B | — | — | 未确认 |
+| 壁仞 | 166M | B | B | — | — | 未确认 |
+| 摩尔线程 | MTT S5000 | B | B | — | — | 未确认 |
+| 海光 | BW1000 HCU | — | B* | — | — | 未确认 |
+| Rebellions | RBLN NPU | B | B | — | — | 未确认 |
+| 昇腾 | 910B4 / A2 | C | — | — | — | 原生 PD / RAS |
+| 昇腾 | A3 / 950PR / 950DT | — | — | — | — | 官方 PD 产品范围 |
+| 燧原 | GCU（型号待确认） | D | — | — | — | 未确认 |
+| 昆仑芯 / 寒武纪 | 具体组合待确认 | — | — | — | — | 未确认 |
+
+基础列取 optimized-baseline 或独立 PoC，PD、精确 KV 与分层 KV 分别取各自指南。各列可能使用不同模型和引擎，不能组合推导为同一配置已全量验证。A 不保证当前每次 CI 都成功；B* 特指海光 main；燧原仅见 main 基础指南提及 overlay，未核验完整配置。另有 x86 CPU-only 参考路径，不计入加速器 PD 广度。[矩阵 CSV](../assets/mindie-motor-vs-llm-d/hardware-ecosystem-data.csv)。
+
+#### 4.5.2 NVIDIA、AMD、Intel、Google TPU：主力路径
+
+| 平台 | 参考引擎与 PD 配置 | 设备及网络 | 关键边界 |
+|---|---|---|---|
+| NVIDIA | H200，gpt-oss-120b，vLLM P TP1 / D TP4；SGLang P/D TP2 | nvidia.com/gpu 或 DRA；NIXL；IB/RoCE/EFA 按 Overlay | 默认路径；H800、H20、RTX PRO、GB10 不由 H200 参考自动认证 |
+| AMD | Instinct，gpt-oss-120b，vLLM P TP1 / D TP4 | ROCm、amd.com/gpu 或 DRA；NIXL / MoRI-IO；MI300X OCI RDMA 配置 | 精确路由、native/LMCache 分层路径；SGLang PD 未确认同等级 |
+| Intel | Qwen3-0.6B，vLLM 1P1D，各 1 XPU | DRA、Level Zero/UCX，RDMA 可选 GPU-NIC PCIe 对齐 | 小模型 PD nightly；main 有 SGLang 社区 PD 路径；不等于大 MoE 性能 |
+| TPU v5p | Qwen3-32B，P/D 各 4 chips TP4 | GKE、TPUConnector | PD 与分层 KV 有 nightly 参考 |
+| TPU v6e / v7 | v6e Qwen3-32B；v7 Qwen3.5-397B-A17B-FP8，含 PCP/DP、动态切片 | GKE、TPUConnector / HMA / Raiden，ICI/DCN | 引用的 v6e/v7 PD、精确路由、分层 KV 为社区路径；v6e nightly 因容量转至 v5p |
+
+来源：[Accelerators](https://llm-d.ai/docs/getting-started/accelerators)、[PD 指南（release-1.0）](https://llm-d.ai/docs/well-lit-paths/foundations/pd-disaggregation)、[main PD 指南](https://github.com/llm-d/llm-d/blob/main/guides/pd-disaggregation/README.md)、[基础部署](https://github.com/llm-d/llm-d/blob/main/guides/optimized-baseline/README.md)、[精确路由](https://github.com/llm-d/llm-d/blob/main/guides/precise-prefix-cache-routing/README.md)、[分层 KV](https://github.com/llm-d/llm-d/blob/main/guides/tiered-prefix-cache/README.md)。
+
+对于 RTX PRO 5000 PCIe、H800、DGX Spark，应单独验证镜像计算架构、NIXL/UCX、GPU-NIC/NUMA 拓扑及同机/跨机 KV 传输。H200 参考不能替代实测。TPU 的 GKE/DRA 路径也不可直接套用于私有化 x86 集群。
+
+#### 4.5.3 国产芯片：具体 PD 配置与技术差异
+
+| 厂商 | 引擎 | PD 示例 | KV 数据面 | 部署注意点 |
+|---|---|---|---|---|
+| 天数智芯 BI-V150 | CoreX vLLM fork | Qwen3-32B，P TP4 / D TP4，共 4 boards、8 devices | IluNixlConnector / UCX，device buffer | iluvatar.com/gpu 按 board 计数时与 TP 的 die 数不同；另有 DeepSeek-V4-Flash 混部 DP8+EP |
+| 沐曦 C500X | vLLM | Qwen3-32B，P TP2 / D TP4 | NixlConnector / TCP，MACA UCX transport | metax-tech.com/gpu；不能照搬 CUDA transport；TCP 示例不证明 RDMA 性能 |
+| 壁仞 166M | vLLM | Qwen2.5-72B-Instruct-GPTQ-Int8，P/D TP4 | NIXL / RDMA，UCX rc_v，CPU buffer | birentech.com/gpu 与 rdma/ib；CPU staging 需实测，非 GPU Direct 证据 |
+| 摩尔线程 MTT S5000 | vLLM / SGLang | vLLM P/D TP4 单机；SGLang P/D TP8 双机 | vLLM Mooncake TCP/MUSA；SGLang Mooncake RDMA | mthreads.com/gpu；参考要求 P/D TP 相同，非异构 TP 验证 |
+| 海光 BW1000 HCU 64 GiB | SGLang | Qwen3-32B，P/D TP4，跨节点 | Mooncake / RoCE | main community；HAMi、HCU device plugin >=3.0.2、RDMA plugin、Multus 多 rail、DTK 26.04；DisaggregatedSet |
+| 昇腾 A2/A3、950PR/DT | vLLM-Ascend / SGLang | Motor 官方 PD；llm-d 已核实 910B4 单卡链路 | Mooncake 等引擎/Motor 路径 | 引擎 PD 文档不等于 llm-d PD 已适配 |
+| 燧原 GCU | main 提及 vLLM overlay | 未核验 | 未核验 | 需获取实际 overlay、镜像与验证记录 |
+| 昆仑芯、寒武纪 | 未确认 llm-d 完整指南 | 未核验 | 未核验 | 引擎支持不等于 llm-d 支持 |
+
+Rebellions（韩国）也是重要 NPU 参照：vllm-rbln 是 vLLM 平台插件；基础方案使用单 NPU 副本，PD 方案则使用 MiniMax-M2.7、P PP4 / D DP4+EP、RblnNixlConnector 和 RoCE VF（DRA）。说明 llm-d 不依赖 CUDA 设备语义，但 NPU 仍需适配自有缓存粒度、Rank 与调度参数。不同文档及分支的 prefix caching 描述存在差异，不能把特定 gpt-oss 模型滑窗缓存限制推广到全部 Rebellions 模型。
+
+来源：[上游 PD 及 Connector](https://github.com/llm-d/llm-d/blob/main/guides/pd-disaggregation/README.md)、[基础部署](https://github.com/llm-d/llm-d/blob/main/guides/optimized-baseline/README.md)、[硬件维护者与资源要求](https://llm-d.ai/docs/getting-started/accelerators)、[海光 Mooncake](https://github.com/HYGON-AI/mooncake-das)。海光出现在 main PD 指南，而非此次读取的 release-1.0 网页表。
+
+#### 4.5.4 Motor 昇腾纵深与 llm-d 昇腾现状
+
+Motor 官方 latest 配置明确列出三类产品标识：
+
+| 平台 | hardware_type | Kubernetes nodeSelector | 支持边界 |
+|---|---|---|---|
+| Atlas 800I A2（910B 相关平台） | 800I_A2 | accelerator=huawei-Ascend910；accelerator-type 区分产品 | 3.2.0 有 PD 快速开始；A2 linkdown 专用故障策略 |
+| Atlas 800I A3 超节点（910C 相关平台） | 800I_A3 | accelerator=huawei-Ascend910；accelerator-type 区分产品 | PD、KV 池、超节点组网按引擎、驱动及产品核验 |
+| Ascend 950PR / 950DT | Ascend950 | accelerator=huawei-npu | 官方 PD 范围；MemCache、Mooncake 文档明确列举 950PR，不可顺带认证 DT 全部后端 |
+
+Motor stable 特性表中，vLLM-Ascend/SGLang 均有 PD、KV 亲和、KV 池化、K8s 伸缩和 ScaleP2D 相关支持；Docker-only 不含表中自动伸缩、实例重调度和 ScaleP2D。EPD、D2D 权重加载、精度检测等还受引擎约束。A2 linkdown 与非 A2 故障处理策略不同，说明型号逻辑进入故障控制路径。这里以官方产品形态和 hardware_type 为准，不把 910B/910C 芯片编号与所有服务器严格等同。
+
+llm-d 的昇腾厂商侧已验证环境：**Atlas 900 A2 / 910B4 单卡，CANN 9.1.0，vLLM 与 vLLM-Ascend 0.23.0，EPP v1.0.0，Envoy 1.33.2，ARM64，Qwen3-0.6B**，静态 endpoints.yaml、非 K8s 三进程部署。证据只覆盖基础路由，不证明 K8s NPU Overlay、多机 PD、真实 KV Event 索引、分层 KV、Wide EP 或 RAS；llm-d 上游 Accelerators/PD 列表本次未确认昇腾条目。
+
+vLLM-Ascend 已公开 DeepSeek-V4-Flash A2/A3 多节点 PD 与 950DT 单节点 PD（MooncakeConnectorV2）指南，说明引擎数据面存在复用基础；llm-d 仍需验证 Connector 协调协议、资源拓扑、KV Events、Rank、故障恢复。950PR 的具体模型与量化组合另查。
+
+来源：[Motor 配置](https://mindie-motor.readthedocs.io/zh-cn/latest/user_guide/configuration/config_reference/)、[Motor 3.2 PD](https://mindie-motor.readthedocs.io/zh-cn/v3.2.0/user_guide/features/pd_disaggregation/)、[Motor 特性表](https://mindie-motor.readthedocs.io/zh-cn/stable/user_guide/features/supported_features/)、[可靠性](https://mindie-motor.readthedocs.io/zh-cn/v3.2.0/design/fault_tolerance/overview/)、[MemCache](https://mindie-motor.readthedocs.io/zh-cn/latest/user_guide/features/inference_scheduling/kv_cache_store/memcache/)、[Mooncake](https://mindie-motor.readthedocs.io/zh-cn/latest/user_guide/features/inference_scheduling/kv_cache_store/mooncake/)、[昇腾 llm-d 最小部署](https://ascend.github.io/docs/sources/llm_d/index.html)、[vLLM-Ascend DeepSeek-V4-Flash](https://docs.vllm.ai/projects/ascend/zh-cn/latest/tutorials/models/DeepSeek-V4-Flash.html)。
+
+#### 4.5.5 为什么 llm-d 能复用控制面，但不能仅换镜像
+
+![llm-d 多硬件抽象与三类接口合同](../assets/mindie-motor-vs-llm-d/hardware-abstraction.svg)
+
+| 层级 | 可复用主体 | 硬件适配 |
+|---|---|---|
+| API / 调度 | Gateway、EPP Filter/Scorer/Picker | tokenizer、模型健康、latency calibration |
+| 资源与编排 | InferencePool、Deployment/LWS/DisaggregatedSet | Extended Resource/DRA、卡/板/die、NIC、Gang/NUMA/多轨 |
+| 模型引擎 | OpenAI 接口、生命周期 | 容器、CANN/ROCm/MUSA/CoreX/DTK、量化与并行 |
+| PD 数据面 | 角色标签、通用选点 | kv_transfer_params、请求顺序、Rank、Connector 与传输 |
+| 精确 KV | Indexer、事件消费、评分 | token hash、block size、event replay、cache group |
+| 分层与共享 KV | offload 策略 | CPU/SSD 后端、内存注册、数据路径和生命周期 |
+| Day-2 | SLO、监控、滚动升级 | 设备 RAS、错误码、分布式恢复、排空及权重加载 |
+
+llm-d 上游要求硬件支持至少有可公开获得的 vLLM 容器；进入 well-lit paths 还需维护者及每版本部署验证。nightly CI 是更高等级，并非所有社区配置的现状。[硬件贡献要求](https://llm-d.ai/docs/getting-started/accelerators)；[发布测试矩阵](https://github.com/llm-d/llm-d/tree/release-1.0/release#release-testing)。
+
+llm-d 将厂商逻辑主要放在 Overlay、引擎插件和 Connector；Motor 的硬件类型、MindCluster 及设备故障语义进入更深的运行时控制路径。跨厂商化需抽象这些接口。这是 llm-d 边际成本通常更低的根本原因。
+
+**数据面不是单项能力：** NIXL TCP、RDMA、Mooncake Transfer Engine 和 Mooncake Store 解决不同问题。PD 传输通过不等于共享 KV 池；近似 prefix 路由不等于真实事件索引。相同 Connector 名称也不能保证 TP、layout、transport、恢复协议兼容。异构 P/D 需要两侧 KV ABI 和传输后端双向兼容。
+
+#### 4.5.6 异构平台实施优先级
+
+| 优先级 | 工作 | 验收 |
+|---|---|---|
+| P0 | NVIDIA llm-d + 昇腾 Motor 双 Runtime | 模型服务 API、MHE 版本、服务级路由、可观测性 |
+| P0 | llm-d 910B 单卡 → 多卡/多实例 K8s Overlay | 资源发现、镜像、并行、输出、指标与故障退出 |
+| P0 | 910C 1P1D → 3P1D，MooncakeConnectorV2 / 目标版本 | Decode external hit、传输字节、无静默重算、TTFT/TPOT/Goodput、取消/超时/Rank |
+| P1 | 950PR/DT、910B/910C 真实 KV Event 与分层 KV | 模型支持、block/hash、生命周期、索引准确、主机内存及网络 |
+| P1 | 天数、沐曦、壁仞、摩尔线程、海光 | 从现有 Overlay 起步，锁定版本，补长上下文、MoE、稳定性和 CI |
+| P2 | 燧原、昆仑芯、寒武纪等 | 获取公开镜像、设备插件、PD Connector 后确定范围 |
+| P2 | 独立 Runtime Agent 与 RAS | 统一 Discover/Health/Recover 契约，避免与 K8s 重复恢复 |
+
+建议 MHE capability catalog 的键至少为 vendor / product / server topology / engine / engine version / model / dtype / connector / deployment mode / guide commit。能力值逐项记录 baseline、PD、precise KV、tiered KV、wide EP、autoscale、RAS，以及 evidence URL、状态、测试日期、SLO 和限制，不能采用单一 supported=true。
+
+当前 910C x86 + Linux 5.10 + 灵衢环境，需先解决存储数据面/地址空间兼容问题，不因更换控制面而假定问题消失。第一阶段做模型级统一路由、同兼容域内 PD 和 KV，避免把多厂商支持误写为跨芯片直接 KV 传输已经验证。
+
+本节为公开文档级核验，未实际运行 nightly 或实机 benchmark；生产交付必须锁定 commit、镜像 digest 和环境清单。第 8 节人周预算暂保留，不因社区适配数量增加就直接下调。
+
 
 ### 4.6 MHE 配置管理
 
