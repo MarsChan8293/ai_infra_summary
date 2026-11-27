@@ -5,6 +5,8 @@
 - 对比基线：MindIE-Motor 3.x 与 llm-d 公开架构（包括此前调研中的 v1.0 能力描述）。
 - 证据边界：本文由对话中的架构调研整理而来，未重新逐项核验版本标签、功能合入状态及支持矩阵，未进行实机测试。特性支持必须结合具体 release/commit、引擎、模型、硬件与部署方式验证。以下架构图为职责示意，不是严格的请求路径。
 
+- 更新：补齐 SVG 配图及跨硬件适配工作量；保留 Mermaid、可检索表格及原始 CSV。配图目录：[assets](../assets/mindie-motor-vs-llm-d/README.md)。
+
 ## 1. 核心结论
 
 两者均位于 vLLM/SGLang 等引擎之上，承担分布式推理服务的编排和调度。Motor 偏自包含的运行时控制与昇腾深度适配，llm-d 偏 Kubernetes 原生、可组合的服务基础设施。前者更强调实例进程生命周期、PD 拓扑、硬件级可靠性；后者更强调 Gateway API、可插拔选点、缓存感知、多租户与 SLO 治理。
@@ -12,6 +14,10 @@
 建议纯昇腾生产集群优先评估 Motor，NVIDIA 云原生集群优先评估 llm-d；异构 MaaS 采用统一控制面和多 Runtime Adapter，不强制一种运行时覆盖所有芯片。
 
 ## 2. 逻辑架构
+
+![Motor 与 llm-d 整体架构对比](../assets/mindie-motor-vs-llm-d/architecture.svg)
+
+
 
 ### 2.1 MindIE-Motor
 
@@ -75,6 +81,10 @@ Gateway/代理与 EPP（Endpoint Picker）分工：前者承载流量，后者�
 
 ## 3. 功能矩阵
 
+![核心功能矩阵](../assets/mindie-motor-vs-llm-d/feature-matrix.svg)
+
+
+
 “支持/方案”指此前调研所见的组件或设计能力，不代表所有组合 GA；“待确认”不等于不支持。特别是 llm-d 的新特性和 Motor 的专项 RAS 需核验目标发行版。
 
 | 维度 | MindIE-Motor | llm-d |
@@ -114,11 +124,19 @@ Gateway/代理与 EPP（Endpoint Picker）分工：前者承载流量，后者�
 
 ### 4.1 请求调度
 
+![EPP 调度逻辑](../assets/mindie-motor-vs-llm-d/epp-scheduling.svg)
+
+
+
 Motor 将请求解析、负载统计、选点、PD 协同与故障隔离集中于 Coordinator。llm-d 将代理与 EPP 决策分离，可组合 Filter（健康与角色）、Scorer（KV 命中、队列、预测时延、会话）、Picker（实例选择）及数据生产插件。
 
 长上下文 Agent 场景可优先 KV 命中；在线聊天可优先预计 TTFT/ITL。注意 KV 命中不一定意味着最低时延，应把剩余 Prefill 计算、排队、KV 传输及 Decode 负载统一计入成本。Motor 也在推进选点插件化；不宜将两者简单归类为固定算法与插件算法。
 
 ### 4.2 KV Cache 管理
+
+![KV 管理架构对比](../assets/mindie-motor-vs-llm-d/kv-management.svg)
+
+
 
 Motor 借助 MultiConnector 等方式组合 PD 实时传输和外部 KV 后端。llm-d 强调全局缓存索引与调度、P2P 获取、分层卸载的协同。两者并不是“一个只有外部池、一个才有全局索引”的互斥设计。
 
@@ -144,6 +162,10 @@ Motor 的差异化价值在于设备、引擎进程、分布式实例之间协�
 对昇腾超节点，应测试故障隔离时间、恢复时间、健康实例影响、请求成功率、KV 污染范围及恢复后的正确性。重启副本不等于恢复在途请求。
 
 ### 4.4 弹性伸缩
+
+![弹性伸缩逻辑](../assets/mindie-motor-vs-llm-d/autoscaling.svg)
+
+
 
 Motor 以负载指标、HPA/Infer Operator 及 PD 配比建议为参考，llm-d 强调 SLO 驱动的伸缩与分角色容量调整。此前调研指出 llm-d WVA 有弃用迹象，正式选型前需核实目标版本的替代控制器与 API，避免绑定过时组件。
 
@@ -178,6 +200,10 @@ Motor 以负载指标、HPA/Infer Operator 及 PD 配比建议为参考，llm-d 
 
 ## 5. 工程能力主观评分
 
+![十维度能力评分](../assets/mindie-motor-vs-llm-d/capability-scores.svg)
+
+
+
 满分 5，仅为架构覆盖度判断，不是 benchmark；硬件/引擎版本不同会改变评分。
 
 | 能力 | Motor | llm-d |
@@ -194,6 +220,10 @@ Motor 以负载指标、HPA/Infer Operator 及 PD 配比建议为参考，llm-d 
 | 企业平台二次开发 | 4 | 4.5 |
 
 ## 6. 统一异构推理平台建议
+
+![统一异构推理平台](../assets/mindie-motor-vs-llm-d/unified-platform.svg)
+
+
 
 ```mermaid
 flowchart TD
@@ -243,7 +273,113 @@ flowchart TD
 | 私有化一体机 | 根据硬件选择 Runtime，统一安装和运维 |
 | 自研 AI Infra | MHE、异构管理、KV 兼容域、自动性能调优 |
 
-## 8. 建议 PoC 与验收（新增工程验证项）
+## 8. 跨硬件适配：Motor → GPU vs llm-d → NPU
+
+**结论：在已有推理引擎与 Connector 的前提下，常规生产功能对齐通常是 llm-d 适配昇腾 NPU 更省工；仅做 PD 分离时两条路线可能接近甚至反转。如果要求完整 Motor 级硬件 RAS 对齐，则不能直接比较常规适配成本。**
+
+
+![跨硬件适配影响矩阵](../assets/mindie-motor-vs-llm-d/adaptation-matrix.svg)
+
+
+
+### 8.1 第一性原理与范围
+
+总成本 W = W(部署) + W(接口) + W(数据面) + W(RAS) + W(验证)。决定成本的是硬件相关逻辑侵入的层数与耦合度、目标硬件数据面成熟度，以及运行时自身承担的可靠性责任，而非代码行数。假定 GPU 为 NVIDIA，NPU 为昇腾 910B/910C/950 系列，使用既有 vLLM/vLLM-Ascend，不包含算子、编译器、驱动及底层传输引擎从零开发。
+
+| 模块 | Motor → GPU | llm-d → NPU |
+|---|---|---|
+| 请求入口 / 选点 | 大体复用 | 大体复用 |
+| 引擎启动 | 中等 | 较小 |
+| 设备管理 / K8s | 较大，需剥离 MindCluster 耦合 | 较小至中等，设备插件和 Overlay |
+| PD 分离 | 中等，复用 NIXL 协调路径需验证 | 中等至较大，Mooncake 协议需验证 |
+| KV 池化 | 中等，GPU 后端较成熟 | 中等，昇腾后端集成 |
+| 通信配置 / 拓扑 | NCCL / NVLink / PCIe 适配 | HCCL / HCCS / UB 适配 |
+| 监控 | NVML / DCGM 与原指标契约 | NPU Exporter 与 EPP 指标 |
+| 故障检测 | 较大 | 中等 |
+| 故障自愈 / 权重快载 | 目标依赖，完整对齐较大 | 目标依赖，完整对齐较大 |
+| 伸缩 | 中等 | 较小，按角色和资源适配 |
+
+### 8.2 引擎启动与设备管理
+
+Motor 已有原生引擎启动方向（vllm serve、sglang.launch_server），需要隔离设备资源分配、环境变量、拓扑、监控及恢复逻辑。建议 DeviceBackend 抽象，不在核心代码大量添加 if GPU。
+
+
+![DeviceBackend 抽象](../assets/mindie-motor-vs-llm-d/device-backend.svg)
+
+
+
+| 昇腾 | NVIDIA 对应生态（非严格一一等价） |
+|---|---|
+| ASCEND_RT_VISIBLE_DEVICES | CUDA_VISIBLE_DEVICES |
+| CANN / HCCL | CUDA / NCCL |
+| torch_npu / NPU Graph | torch.cuda / CUDA Graph |
+| NPU 拓扑 / RAS | NVLink、PCIe、NVML、DCGM |
+| Ascend Operator / Device Plugin | GPU Operator / Device Plugin |
+| RankTable | NCCL 多机启动与 Rank 配置 |
+
+llm-d 的控制面通过 Kubernetes Pod 启动引擎，通常替换 vLLM-Ascend 镜像、NPU Resource/Device Plugin、挂载、HCCL 与模型参数；InferencePool、EPP、LWS 等通用机制可以复用。仍须验证拓扑亲和、Gang Scheduling、多机 Rank、网络资源、健康检查及权限，不应将配置替换等同于完整支持。
+
+### 8.3 PD 分离是例外
+
+
+![PD 分离适配路径](../assets/mindie-motor-vs-llm-d/pd-adaptation.svg)
+
+
+
+此前调研发现 Motor 3.2 的设计包含 NixlConnector 及 Prefill Handoff Decode、Mooncake 与 Layerwise 等协调模式；llm-d Router 也有多 Connector 路径。若 GPU 侧 vLLM NIXL 与 Motor 协议匹配，可减少核心修改；llm-d 使用 Ascend Mooncake 时应验证其 V1/V2、Layerwise、Push/Pull 的交互差异。
+
+关键合同：kv_transfer_params、P/D 请求顺序、Block 分配和释放、Transfer ID 与 DP Rank 映射、取消、超时、失败重试、Layerwise 增量传输。协议兼容时复用传输引擎，不自行重写 KV 数据面。
+
+### 8.4 KV 数据面与集群可靠性
+
+Motor 可复用 CUDA vLLM KV Event、Token Block Hash、NIXL、Mooncake、GPU CPU/SSD Offload；llm-d 可复用兼容的 vLLM-Ascend 事件与现有 Mooncake、MemCache、YuanRong、LMCache-Ascend 等后端。应分别核验事件语义、索引准确性、传输后端及缓存生命周期。910C Linux 5.10 + 灵衢的底层地址空间约束不会被上层控制面消除。
+
+常规恢复包括 Pod/进程重启、故障隔离、分布式副本重建；完整 RAS 还涉及 UCE 原地快恢、通信恢复、ScaleP2D、请求续推、权重 D2D 加载。Motor → GPU 需要适配 GPU RAS 与引擎能力；llm-d → NPU 若要对齐 Motor 全部功能，需额外实现或集成运行时管理，可能反而更贵。重启、恢复在途请求和无损恢复必须分开验收。
+
+### 8.5 人周估算
+
+
+![适配工作量堆叠图](../assets/mindie-motor-vs-llm-d/engineering-effort.svg)
+
+
+
+| 模块 | Motor → GPU（人周） | llm-d → NPU（人周） |
+|---|---:|---:|
+| 引擎接入 | 2–4 | 1–2 |
+| 集群编排 | 3–5 | 2–4 |
+| PD 分离 | 2–4 | 3–6 |
+| KV 管理 | 2–4 | 2–4 |
+| 监控 | 2–4 | 1–3 |
+| 故障恢复 | 4–8 | 2–4 |
+| 测试验证 | 5–9 | 4–8 |
+| **合计** | **20–38** | **15–31** |
+| **区间中值** | **29** | **23** |
+
+中值比 29/23 ≈ 1.26，约 1.3 倍；区间重叠，不能声称确定倍数。原始数据：[CSV](../assets/mindie-motor-vs-llm-d/effort-data.csv)。完整 RAS 对齐、底层驱动/算子开发、无法复用的 Connector 另行估算。
+
+假设 4 位具备分布式推理经验的工程师，以下为考虑联调、依赖及测试后的累计日历周期（不是各阶段相加）：
+
+| 交付阶段 | Motor → GPU | llm-d → NPU |
+|---|---|---|
+| 基础混部 PoC | 1–2 周 | 2–5 个工作日 |
+| 多机 PD 分离 | 2–4 周 | 2–4 周 |
+| KV 池化、集群管理 | 4–6 周 | 3–5 周 |
+| 常规生产可用 | 7–12 周 | 5–10 周 |
+| 完整 RAS 等价 | 单独立项 | 单独立项 |
+
+### 8.6 长期多厂商路线
+
+
+![统一 Runtime Agent](../assets/mindie-motor-vs-llm-d/runtime-agent.svg)
+
+
+
+面向 NVIDIA、昇腾及其他国产加速器，建议参考 llm-d 的通用路由、K8s 编排与 Overlay，同时抽象独立 Runtime Agent 以统一设备管理、健康与恢复契约。不要在 Agent 和 K8s Controller 同时执行相同故障恢复动作。若必须支持非 K8s 环境或保留 Motor 全量特性，可优先评估 Motor 多硬件化。
+
+优先 PoC：① 910C llm-d + vLLM-Ascend + Mooncake 多机 PD；② KV Indexer 消费真实 KV Event 并验证亲和；③ 接入 NPU 故障检测并验证分布式实例隔离、恢复。三个路径均通过后再评估生产化排期。此前对话提及的 NIXL、Ascend Mooncake、版本支持与具体 RAS 特性本次未重新逐文件审计。
+
+
+## 9. 建议 PoC 与验收（新增工程验证项）
 
 | 测试 | 条件 / 观测 |
 |---|---|
@@ -257,7 +393,7 @@ flowchart TD
 | 可观测性 | 关联 Gateway、Runtime、Engine 请求 ID 与指标，检查实际延迟归因 |
 | 正确性 | 同模型同精度同后端做 logits/KV 一致性；不同硬件或量化策略先定义合理误差阈值，不默认可逐位一致 |
 
-## 9. 参考入口及待核验事项
+## 10. 参考入口及待核验事项
 
 - [MindIE-Motor 项目](https://github.com/Ascend/MindIE-Motor)
 - [MindIE-Motor 文档](https://mindie-motor.readthedocs.io/)

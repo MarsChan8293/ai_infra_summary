@@ -2,11 +2,18 @@
 
 AI 推理基础设施的技术构想、架构评估与可实施方案总结。
 
+归档规范：[AGENTS.md](AGENTS.md)（完整技术分析、可编辑 SVG、原始数据、证据边界）。
+
 ## 专题方案
 
 ### MindIE-Motor vs llm-d：分布式推理运行时架构与功能对比（2026-11-27）
 
-**[阅读完整架构对比、能力矩阵与异构推理平台建议](docs/mindie-motor-vs-llm-d-architecture-comparison-2026-11-27.md)**
+**[阅读完整架构对比、能力矩阵、适配工作量与异构推理平台建议](docs/mindie-motor-vs-llm-d-architecture-comparison-2026-11-27.md)**
+
+![Motor 与 llm-d 整体架构](assets/mindie-motor-vs-llm-d/architecture.svg)
+
+- **跨硬件适配工作量（估算）**：Motor → GPU 20–38 人周；llm-d → NPU 15–31 人周。PD 可能是例外，完整 RAS 对齐另行评估。
+- **配图与数据**：[独立 SVG、CSV 资产目录](assets/mindie-motor-vs-llm-d/README.md)。
 
 - **架构差异**：Motor 侧重 Coordinator / Controller / NodeManager 集成式运行时；llm-d 侧重 Gateway / EPP / K8s 控制器的可组合架构。
 - **功能对比**：请求调度、PD/EPD、KV 索引与池化、弹性伸缩、硬件级故障恢复、多租户及 MHE 配置。
