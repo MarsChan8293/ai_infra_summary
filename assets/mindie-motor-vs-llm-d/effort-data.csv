@@ -1,8 +1,8 @@
-module,motor_gpu_min,motor_gpu_max,llmd_npu_min,llmd_npu_max
-引擎接入,2,4,1,2
-集群编排,3,5,2,4
-PD 分离,2,4,3,6
-KV 管理,2,4,2,4
-监控,2,4,1,3
-故障恢复,4,8,2,4
-测试验证,5,9,4,8
+module,motor_gpu_min_person_days,motor_gpu_max_person_days,llmd_npu_min_person_days,llmd_npu_max_person_days
+引擎接入,10,20,5,10
+集群编排,15,25,10,20
+PD 分离,10,20,15,30
+KV 管理,10,20,10,20
+监控,10,20,5,15
+故障恢复,20,40,10,20
+测试验证,25,45,20,40
